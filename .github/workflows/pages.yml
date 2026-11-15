@@ -1,0 +1,20 @@
+# Publishes the installable web app (the pwa folder inside project.zip) to GitHub Pages.
+name: Publish web app
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ["project.zip"]
+permissions: { contents: read, pages: write, id-token: write }
+concurrency: { group: pages, cancel-in-progress: true }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.d.outputs.page_url }}" }
+    steps:
+      - uses: actions/checkout@v4
+      - run: unzip -q project.zip
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: Vending-Manager-Phone-Apps/pwa }
+      - id: d
+        uses: actions/deploy-pages@v4
