@@ -1,0 +1,43 @@
+# Builds the Android app from project.zip. Run it from the Actions tab ("Run workflow").
+# The finished files appear under "Artifacts" on the run page.
+name: Android build
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ["project.zip"]
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project
+        run: unzip -q project.zip && mv Vending-Manager-Phone-Apps app
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - working-directory: app
+        run: npm ci && npx cap sync android
+      - name: Test build (.apk you can install on any Android phone)
+        working-directory: app/android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: vending-manager-test-apk, path: app/android/app/build/outputs/apk/debug/*.apk }
+      - name: Decode upload keystore
+        if: env.HAS_KEYSTORE == 'true'
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > $RUNNER_TEMP/upload.jks
+      - name: Store build (.aab for Google Play)
+        if: env.HAS_KEYSTORE == 'true'
+        working-directory: app/android
+        run: >
+          ./gradlew bundleRelease
+          -Pandroid.injected.signing.store.file=$RUNNER_TEMP/upload.jks
+          -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}"
+          -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}"
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_KEYSTORE == 'true'
+        with: { name: vending-manager-play-bundle, path: app/android/app/build/outputs/bundle/release/*.aab }
