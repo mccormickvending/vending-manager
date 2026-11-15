@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 const APP = "com.mccormickvending.vendingmanager";
 const sh = c => execSync(c, { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
-const shot = n => { execSync(`adb exec-out screencap -p > shots/${n}.png`); };
+const shot = n => { execSync(`adb exec-out screencap -p > shots/${n}.png`); let f = ""; try { f = sh("adb shell dumpsys window | grep mCurrentFocus"); } catch {} console.log("screen", n, "->", f); R.steps.push({ step: "screen " + n, result: f }); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const R = { steps: [] };
 const log = (k, v) => { R.steps.push({ step: k, result: v }); console.log(k, JSON.stringify(v)); };
