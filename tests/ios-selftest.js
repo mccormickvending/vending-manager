@@ -3,8 +3,14 @@
 (function(){
   const write = async (name, obj) => { try{ await vbmPlugins().Filesystem.writeFile({path:name, data:JSON.stringify(obj, null, 1), directory:"DOCUMENTS", encoding:"utf8"}); }catch(e){ console.log("write failed", e); } };
   const wait = ms => new Promise(r => setTimeout(r, ms));
+  const P = {start:new Date().toISOString(), steps:[]};
+  const prog = async step => { P.steps.push(step + " @" + Math.round(performance.now() / 1000) + "s"); console.log("SELFTEST " + step); try{ await write("selftest-progress.json", P); }catch(e){} };
+  window.addEventListener("error", e => { P.steps.push("window error: " + e.message); });
   async function run(){
+    console.log("SELFTEST loaded");
     for(let i = 0; i < 60 && !(typeof D !== "undefined" && typeof render === "function" && typeof vbmPlugins === "function"); i++) await wait(500);
+    console.log("SELFTEST app ready: " + (typeof D) + " plugins: " + (typeof vbmPlugins === "function" && !!vbmPlugins()));
+    await prog("app ready");
     const R = {}, errs = [];
     window.addEventListener("error", e => errs.push(String(e.message)));
     let phase = ""; try{ phase = localStorage.getItem("__selftest") || ""; }catch(e){}
@@ -14,17 +20,18 @@
     }
     R.environment = {ua:navigator.userAgent, native:!!(window.Capacitor && Capacitor.isNativePlatform()), platform:window.Capacitor && Capacitor.getPlatform(), vbmNative:vbmNative(), storageOK, LS_OK};
     loadSampleNow(); await wait(800); D.settings.storageNoticeSeen = true; save(); render();
-    R.sample = {sales:D.sales.length, machines:D.locations.length};
+    R.sample = {sales:D.sales.length, machines:D.locations.length}; await prog("sample loaded");
     const bad = []; for(const v of Object.keys(VIEWS)){ try{ go(v, true); const t = document.querySelector("#view").innerText; if(/NaN|undefined|Infinity/.test(t)) bad.push(v + ": odd text"); if(document.documentElement.scrollWidth > innerWidth + 2) bad.push(v + ": wider than screen"); }catch(e){ bad.push(v + ": " + e.message); } }
-    R.pages = {count:Object.keys(VIEWS).length, problems:bad};
+    R.pages = {count:Object.keys(VIEWS).length, problems:bad}; await prog("pages checked");
     const s0 = D.sales[0]; D.sales.push(Object.assign({}, s0, {id:uid(), date:today(), imp:undefined, nx:undefined})); R.addSale = {saved:save(), sales:D.sales.length};
     /* exports, captured instead of shared so the test can keep going */
     const real = vbmShareFile, got = [];
     window.vbmShareFile = async (n, d) => { got.push(n + " " + (d.length || d.byteLength)); return true; };
     try{ exportJSON(); exportCSV("sales"); downloadAccountant(); }catch(e){ got.push("error " + e.message); }
+    await prog("exports started: " + got.join(", "));
     go("reports", true); window.print();
     for(let i = 0; i < 40 && !got.some(g => /\.pdf /.test(g)); i++) await wait(500);
-    R.exports = got;
+    R.exports = got; await prog("pdf done");
     window.vbmShareFile = real;
     /* the plugins themselves: write and read back a file */
     try{ const F = vbmPlugins().Filesystem; const w = await F.writeFile({path:"probe.txt", data:"hello", directory:"CACHE", encoding:"utf8"}); const r = await F.readFile({path:"probe.txt", directory:"CACHE", encoding:"utf8"}); R.filesystem = {uri:!!w.uri, readBack:r.data}; }catch(e){ R.filesystem = {error:e.message}; }
@@ -34,5 +41,5 @@
     /* finally open the real share sheet so the workflow can screenshot it */
     go("settings", true); exportJSON();
   }
-  run();
+  run().catch(async e => { P.steps.push("FAILED: " + (e && e.stack || e)); console.log("SELFTEST FAILED " + e); await write("selftest-progress.json", P); });
 })();
