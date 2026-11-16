@@ -4,7 +4,7 @@ set -x
 mkdir -p shots
 BUNDLE=com.mccormickvending.vendingmanager
 cp tests/ios-selftest.js app/ios/App/App/public/selftest.js
-sed -i '' 's#</body>#<script src="selftest.js"></script></body>#' app/ios/App/App/public/index.html
+python3 -c "p='app/ios/App/App/public/index.html'; s=open(p,encoding='utf-8').read(); i=s.rfind('</body>'); open(p,'w',encoding='utf-8').write(s[:i]+'<script src=\"selftest.js\"></script>'+s[i:])"
 echo "selftest tags in index.html: $(grep -c selftest.js app/ios/App/App/public/index.html)"
 cd app/ios/App
 xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO -quiet || { echo "BUILD FAILED"; exit 1; }
