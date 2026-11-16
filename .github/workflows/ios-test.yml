@@ -1,0 +1,21 @@
+# Builds the iPhone app and tests it on an iPhone simulator in GitHub's cloud (free for public repositories).
+# Results and screenshots are saved as "ios-test-results" on the run page.
+name: iOS test
+on: { workflow_dispatch: {} }
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project
+        run: unzip -q project.zip && mv Vending-Manager-Phone-Apps app
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - working-directory: app
+        run: npm ci && npx cap sync ios
+      - name: Build and run on simulator
+        run: bash tests/ios-check.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ios-test-results, path: shots }
